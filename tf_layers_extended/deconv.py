@@ -1,8 +1,8 @@
-import numpy as np
 import tensorflow as tf
 from tensorflow.python.keras import initializers
 from tensorflow.python.keras import regularizers
 from tensorflow.python.keras.engine.base_layer import Layer
+from nn_ops_extent.ops_extent import deconv1d
 
 
 class Deconvolution(Layer):
@@ -49,15 +49,18 @@ class Deconvolution(Layer):
         assert isinstance(self.padding, tuple) and len(self.padding) <= 3, 'Padding is specified by tuple with left, ' \
                                                                            'right padding lengths and mode (optionally)'
         if len(self.padding) == 3:
-            return np.pad(input_tensor, (self.padding[0], self.padding[1]), mode=self.padding[-1])
+            return tf.pad(input_tensor, ((0, 0), (self.padding[0], self.padding[1])), mode=self.padding[-1])
         else:
-            return np.pad(input_tensor, (self.padding[0], self.padding[1]))
+            return tf.pad(input_tensor, ((0, 0), (self.padding[0], self.padding[1])))
 
     def _match_filters_to_input_padding(self, input_shape):
-        len_pad = input_shape[-1] - self.w.shape[-1]
-        return tf.Variable(np.pad(self.w,
-                                  (0, len_pad),
-                                  'constant')[:-len_pad],
+        if self.padding is not None:
+            len_pad = input_shape[-1] + self.padding[0] + self.padding[-1] - self.w.shape[-1]
+        else:
+            len_pad = input_shape[-1] - self.w.shape[-1]
+        return tf.Variable(tf.pad(self.w,
+                                  ((0, 0), (0, len_pad)),
+                                  'constant'),
                            trainable=True,
                            dtype='float32')
 
@@ -78,10 +81,14 @@ class Deconvolution(Layer):
                                      trainable=True,
                                      dtype='float32')
 
-    def call(self, inputs, training=None):
-        x = None
+    def call(self, inputs, training=True):
+        x = tf.constant(inputs)
+        # Apply padding to input if specified
         if self.padding is not None:
-            x = self._pad_input(inputs)
+            x = self._pad_input(x)
+        # Apply Wiener deconvolution on inputs
+        x = deconv1d(input_vect=x, filters=self.w, lambds=self.s)
+        # Apply bias accordingly
         if self.use_bias:
             x = x + self.b
         x = self.activation(x)

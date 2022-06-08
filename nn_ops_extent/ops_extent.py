@@ -12,9 +12,12 @@ def deconv1d(input_vect, filters, lambds):
     :param lambds: SNR values
     :return: The deconvolved signal.
     """
+    # Complete possibly real input vector with zeros for imaginary parts
+    if all(tf.math.imag(input_vect)):
+        input_vect = tf.complex(input_vect, tf.zeros_like(input_vect, dtype='float32'))
     # Generate the Fourier transforms of the input vectors and filter's transfer function
     fft_input = tf.constant(tf.signal.fft(input_vect))
-    fft_filters = tf.constant(tf.signal.fft(filters))
+    fft_filters = tf.constant(tf.signal.fft(tf.complex(filters[0], filters[-1])))
     # Compute simple Wiener deconvolution
     deconvolved = tf.constant(tf.math.real(tf.signal.ifft(tf.divide(tf.multiply(fft_input, tf.math.conj(fft_filters)),
                                                                     (tf.add(tf.multiply(fft_filters,

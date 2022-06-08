@@ -50,13 +50,12 @@ class Deconvolution(Layer):
                                       regularizer=self.kernel_regularizer,
                                       trainable=True,
                                       dtype='float32')
-        self.w_imag = self.add_weight(shape=(self.filters, self.kernel_size[0]),
+        self.w_imag = self.add_weight(shape=self.w_real.shape,
                                       initializer=self.kernel_initializer,
                                       regularizer=self.kernel_regularizer,
                                       trainable=True,
                                       dtype='float32')
-        if self.w.shape[-1] < input_shape:
-            self.w = self._match_filters_to_input_padding(input_shape)
+        self._pad_filters2match_input(input_shape)
         self.s = self.add_weight(shape=(self.filters, 1),
                                  initializer=self.lambd_initializer,
                                  regularizer=self.lambd_regularizer,
@@ -94,14 +93,15 @@ class Deconvolution(Layer):
             return tf.pad(input_tensor, ((0, 0), (0, self.padding[0])), mode=self.padding[-1])
         return tf.pad(input_tensor, ((0, 0), (0, self.padding[0])))
 
-    def _match_filters_to_input_padding(self, input_shape):
+    def _pad_filters2match_input(self, input_shape):
+        # Determine pad length
         if self.padding is not None:
-            len_pad = input_shape[-1] + self.padding[0] - self.w.shape[-1]
+            len_pad = input_shape[-1] + self.padding[0] - self.w_real.shape[-1]
         else:
-            len_pad = input_shape[-1] - self.w.shape[-1]
-        if tf.rank(self.w) == 1:
-            return tf.concat(self.w, tf.zeros(shape=(self.padding[0], ), dtype='float32'), axis=0)
-        return tf.pad(self.w, ((0, 0), (0, len_pad)), 'constant')
+            len_pad = input_shape[-1] - self.w_real.shape[-1]
+        # Pad both real and imaginary weights
+        self.w_real = tf.pad(self.w_real, ((0, 0), (0, len_pad)), 'constant')
+        self.w_imag = tf.pad(self.w_imag, ((0, 0), (0, len_pad)), 'constant')
 
     def _serialize_to_tensors(self):
         pass

@@ -13,8 +13,8 @@ class Deconvolution(Layer):
                  padding=None,
                  activation=None,
                  use_bias=True,
-                 kernel_initializer='glorot_uniform',
-                 lambd_initializer='random_normal',
+                 kernel_initializer='lecun_normal',
+                 lambd_initializer='lecun_normal',
                  bias_initializer='zeros',
                  kernel_regularizer=None,
                  lambd_regularizer=None,
@@ -70,10 +70,14 @@ class Deconvolution(Layer):
 
     def call(self, inputs, *args, **kwargs):
         x = tf.constant(inputs)
+        x = tf.expand_dims(x, axis=0)
         # Apply padding to input if specified
         if self.padding is not None:
             x = self._pad_input(x)
         # Apply Wiener deconvolution on inputs
+        print(x.shape[-1], self.w_real.shape[-1])
+        assert x.shape[-1] == self.w_real.shape[-1], 'Input and kernels must have equal shapes. Reduce filters ' \
+                                                     'length, use input padding or increase input length.'
         x = deconv1d(input_vect=x, filters=(self.w_real, self.w_imag), lambds=self.s)
         # Apply bias accordingly
         if self.use_bias:
@@ -85,10 +89,6 @@ class Deconvolution(Layer):
     def _pad_input(self, input_tensor):
         assert isinstance(self.padding, tuple) and len(self.padding) <= 2, 'Padding is specified by tuple with pad ' \
                                                                            'length and mode (optionally)'
-        if tf.rank(input_tensor) == 1:
-            if len(self.padding) == 2:
-                return tf.concat(input_tensor, tf.zeros(shape=(self.padding[0], )), mode=self.padding[-1], axis=0)
-            return tf.concat(input_tensor, tf.zeros(shape=(self.padding[0], )), axis=0)
         if len(self.padding) == 2:
             return tf.pad(input_tensor, ((0, 0), (0, self.padding[0])), mode=self.padding[-1])
         return tf.pad(input_tensor, ((0, 0), (0, self.padding[0])))
@@ -100,8 +100,9 @@ class Deconvolution(Layer):
         else:
             len_pad = input_shape[-1] - self.w_real.shape[-1]
         # Pad both real and imaginary weights
-        self.w_real = tf.pad(self.w_real, ((0, 0), (0, len_pad)), 'constant')
-        self.w_imag = tf.pad(self.w_imag, ((0, 0), (0, len_pad)), 'constant')
+        if len_pad > 0:
+            self.w_real = tf.pad(self.w_real, ((0, 0), (0, len_pad)), 'constant')
+            self.w_imag = tf.pad(self.w_imag, ((0, 0), (0, len_pad)), 'constant')
 
     def _serialize_to_tensors(self):
         pass

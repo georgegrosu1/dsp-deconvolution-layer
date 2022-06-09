@@ -1,7 +1,10 @@
+import copy
+
 import tensorflow as tf
 from tensorflow.python.keras import initializers
 from tensorflow.python.keras import regularizers
 from tensorflow.python.keras import activations
+from tensorflow.python.framework import tensor_shape
 from tensorflow.python.keras.engine.base_layer import Layer
 from nn_ops_extent.ops_extent import deconv1d
 
@@ -45,6 +48,7 @@ class Deconvolution(Layer):
         self.b = None
 
     def build(self, input_shape):
+        input_shape = tensor_shape.TensorShape(input_shape)
         self.w_real = self.add_weight(shape=(self.filters, self.kernel_size[0]),
                                       initializer=self.kernel_initializer,
                                       regularizer=self.kernel_regularizer,
@@ -69,13 +73,11 @@ class Deconvolution(Layer):
                                      dtype='float32')
 
     def call(self, inputs, *args, **kwargs):
-        x = tf.constant(inputs)
-        x = tf.expand_dims(x, axis=0)
+        x = copy.copy(inputs)
         # Apply padding to input if specified
         if self.padding is not None:
             x = self._pad_input(x)
         # Apply Wiener deconvolution on inputs
-        print(x.shape[-1], self.w_real.shape[-1])
         assert x.shape[-1] == self.w_real.shape[-1], 'Input and kernels must have equal shapes. Reduce filters ' \
                                                      'length, use input padding or increase input length.'
         x = deconv1d(input_vect=x, filters=(self.w_real, self.w_imag), lambds=self.s)

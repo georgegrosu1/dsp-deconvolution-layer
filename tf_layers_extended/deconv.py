@@ -1,12 +1,13 @@
 import copy
 
 import tensorflow as tf
+from tensorflow.python.keras import backend as bend
 from tensorflow.python.keras import initializers
 from tensorflow.python.keras import regularizers
 from tensorflow.python.keras import activations
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.keras.engine.base_layer import Layer
-from nn_ops_extent.ops_extent import deconv1d
+from nn_ops_extent.ops_extent import deconv1d, expand_tensor_dims_recursive
 
 
 class Deconvolution(Layer):
@@ -74,9 +75,17 @@ class Deconvolution(Layer):
 
     def call(self, inputs, *args, **kwargs):
         x = copy.copy(inputs)
-        # Apply padding to input if specified
-        if self.padding is not None:
-            x = self._pad_input(x)
+        # Adjust dimensions
+        if bend.ndim(x) == 1:
+            x = expand_tensor_dims_recursive(x, 2)
+            # Apply padding to input if specified
+            if self.padding is not None:
+                x = self._pad_input(x)
+        elif bend.ndim(x) == 2:
+            # Apply padding to input if specified
+            if self.padding is not None:
+                x = self._pad_input(x)
+            x = expand_tensor_dims_recursive(x, 1)
         # Apply Wiener deconvolution on inputs
         assert x.shape[-1] == self.w_real.shape[-1], 'Input and kernels must have equal shapes. Reduce filters ' \
                                                      'length, use input padding or increase input length.'
@@ -84,6 +93,7 @@ class Deconvolution(Layer):
         # Apply bias accordingly
         if self.use_bias:
             x = x + self.b
+        # And activation
         if self.activation is not None:
             x = self.activation(x)
         return x

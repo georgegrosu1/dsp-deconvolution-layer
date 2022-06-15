@@ -7,7 +7,7 @@ from tensorflow.python.keras import regularizers
 from tensorflow.python.keras import activations
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.keras.engine.base_layer import Layer
-from nn_ops_extent.ops_extent import deconv1d, expand_tensor_dims_recursive
+from nn_ops_extent.ops_extent import deconv1d
 
 
 class Deconvolution(Layer):
@@ -67,7 +67,7 @@ class Deconvolution(Layer):
                                  trainable=True,
                                  dtype='float32')
         if self.use_bias:
-            self.b = self.add_weight(shape=(self.filters, 1),
+            self.b = self.add_weight(shape=(1, ),
                                      initializer=self.bias_initializer,
                                      regularizer=self.bias_regularizer,
                                      trainable=True,
@@ -76,19 +76,13 @@ class Deconvolution(Layer):
     def call(self, inputs, *args, **kwargs):
         x = copy.copy(inputs)
         # Adjust dimensions
-        if bend.ndim(x) == 1:
-            x = expand_tensor_dims_recursive(x, 2)
-            # Apply padding to input if specified
-            if self.padding is not None:
-                x = self._pad_input(x)
-        elif bend.ndim(x) == 2:
-            # Apply padding to input if specified
-            if self.padding is not None:
-                x = self._pad_input(x)
-            x = expand_tensor_dims_recursive(x, 1)
-        # Apply Wiener deconvolution on inputs
-        assert x.shape[-1] == self.w_real.shape[-1], 'Input and kernels must have equal shapes. Reduce filters ' \
-                                                     'length, use input padding or increase input length.'
+        assert bend.ndim(x) == 3, f'Inputs shape must be of form (batch_size, #timestamps, #features, ' \
+                                  f'yours is of form {bend.ndim(x)}'
+        # Apply padding to input if specified
+        if self.padding is not None:
+            x = self._pad_input(x)
+        assert x.shape[1] == self.w_real.shape[-1], 'Input and kernels must have equal shapes. Reduce filters ' \
+                                                    'length, use input padding or increase input length.'
         x = deconv1d(input_vect=x, filters=(self.w_real, self.w_imag), lambds=self.s)
         # Apply bias accordingly
         if self.use_bias:
@@ -101,16 +95,27 @@ class Deconvolution(Layer):
     def _pad_input(self, input_tensor):
         assert isinstance(self.padding, tuple) and len(self.padding) <= 2, 'Padding is specified by tuple with pad ' \
                                                                            'length and mode (optionally)'
-        if len(self.padding) == 2:
-            return tf.pad(input_tensor, ((0, 0), (0, self.padding[0])), mode=self.padding[-1])
-        return tf.pad(input_tensor, ((0, 0), (0, self.padding[0])))
+        padded = tf.TensorArray(tf.float32, size=0, dynamic_size=True)
+        # Pad each feature column
+        for i in tf.range(bend.shape(input_tensor)[-1]):
+            feature_i_tsteps = input_tensor[:, :, i]
+            if len(self.padding) == 2:
+                padded_feature = tf.pad(feature_i_tsteps, ((0, 0), (0, self.padding[0])), mode=self.padding[-1])
+            else:
+                padded_feature = tf.pad(feature_i_tsteps, ((0, 0), (0, self.padding[0])))
+            # Change shape back to form (_, timestamps, features) and add to tensor
+            padded = padded.write(i, tf.expand_dims(padded_feature, -1))
+        padded = padded.stack()
+        return tf.reshape(padded, (bend.shape(input_tensor)[0],
+                                   bend.shape(input_tensor)[1] + self.padding[0],
+                                   bend.shape(input_tensor)[-1]))
 
     def _pad_filters2match_input(self, input_shape):
         # Determine pad length
         if self.padding is not None:
-            len_pad = input_shape[-1] + self.padding[0] - self.w_real.shape[-1]
+            len_pad = input_shape[1] + self.padding[0] - self.w_real.shape[-1]
         else:
-            len_pad = input_shape[-1] - self.w_real.shape[-1]
+            len_pad = input_shape[1] - self.w_real.shape[-1]
         # Pad both real and imaginary weights
         if len_pad > 0:
             self.w_real = tf.pad(self.w_real, ((0, 0), (0, len_pad)), 'constant')

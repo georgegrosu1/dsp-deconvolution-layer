@@ -14,7 +14,7 @@ class Deconvolution(Layer):
     def __init__(self,
                  filters,
                  kernel_size,
-                 padding=None,
+                 padding=(None,),
                  activation=None,
                  use_bias=True,
                  kernel_initializer='lecun_normal',
@@ -79,8 +79,11 @@ class Deconvolution(Layer):
         assert bend.ndim(x) == 3, f'Inputs shape must be of form (batch_size, #timestamps, #features, ' \
                                   f'yours is of form {bend.ndim(x)}'
         # Apply padding to input if specified
-        if self.padding is not None:
-            x = self._pad_input(x)
+        if self.padding[0] is not None:
+            if len(self.padding) == 2:
+                x = tf.pad(x, ((0, 0), (0, self.padding[0]), (0, 0)), mode=self.padding[-1])
+            else:
+                x = tf.pad(x, ((0, 0), (0, self.padding[0]), (0, 0)))
         assert x.shape[1] == self.w_real.shape[-1], 'Input and kernels must have equal shapes. Reduce filters ' \
                                                     'length, use input padding or increase input length.'
         x = deconv1d(input_vect=x, filters=(self.w_real, self.w_imag), lambds=self.s)
@@ -92,27 +95,9 @@ class Deconvolution(Layer):
             x = self.activation(x)
         return x
 
-    def _pad_input(self, input_tensor):
-        assert isinstance(self.padding, tuple) and len(self.padding) <= 2, 'Padding is specified by tuple with pad ' \
-                                                                           'length and mode (optionally)'
-        padded = tf.TensorArray(tf.float32, size=0, dynamic_size=True)
-        # Pad each feature column
-        for i in tf.range(bend.shape(input_tensor)[-1]):
-            feature_i_tsteps = input_tensor[:, :, i]
-            if len(self.padding) == 2:
-                padded_feature = tf.pad(feature_i_tsteps, ((0, 0), (0, self.padding[0])), mode=self.padding[-1])
-            else:
-                padded_feature = tf.pad(feature_i_tsteps, ((0, 0), (0, self.padding[0])))
-            # Change shape back to form (_, timestamps, features) and add to tensor
-            padded = padded.write(i, tf.expand_dims(padded_feature, -1))
-        padded = padded.stack()
-        return tf.reshape(padded, (bend.shape(input_tensor)[0],
-                                   bend.shape(input_tensor)[1] + self.padding[0],
-                                   bend.shape(input_tensor)[-1]))
-
     def _pad_filters2match_input(self, input_shape):
         # Determine pad length
-        if self.padding is not None:
+        if self.padding[0] is not None:
             len_pad = input_shape[1] + self.padding[0] - self.w_real.shape[-1]
         else:
             len_pad = input_shape[1] - self.w_real.shape[-1]

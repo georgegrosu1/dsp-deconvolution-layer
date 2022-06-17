@@ -67,6 +67,7 @@ class Deconvolution(Layer):
                                  trainable=True,
                                  dtype='float32')
         if self.use_bias:
+            self.b = self.add_weight(shape=(1, self.filters * input_shape[-1]),
             self.b = self.add_weight(shape=(1, ),
                                      initializer=self.bias_initializer,
                                      regularizer=self.bias_regularizer,

@@ -73,6 +73,7 @@ class Deconvolution(Layer):
                                      trainable=True,
                                      dtype='float32')
 
+    @tf.function
     def call(self, inputs, *args, **kwargs):
         x = copy.copy(inputs)
         # Adjust dimensions
@@ -111,3 +112,6 @@ class Deconvolution(Layer):
 
     def _restore_from_tensors(self, restored_tensors):
         pass
+
+
+Deconv1D = Deconvolution

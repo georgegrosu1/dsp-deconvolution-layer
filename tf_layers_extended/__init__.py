@@ -1,1 +1,1 @@
-from tf_layers_extended.deconv import Deconvolution
+from tf_layers_extended.deconv import Deconv1D

@@ -76,8 +76,8 @@ class Deconvolution1D(Layer):
     @tf.function
     def call(self, inputs, *args, **kwargs):
         x = copy.copy(inputs)
-        # Adjust dimensions
-        assert bend.ndim(x) == 3, f'Inputs shape must be of form (batch_size, #timestamps, #features, ' \
+        # Make sure input shape corresponds to convention of (batch size, timestamps, features)
+        assert bend.ndim(x) == 3, f'Inputs shape must be of form (batch size, #timestamps, #features, ' \
                                   f'yours is of form {bend.ndim(x)}'
         # Apply padding to input if specified
         if self.padding[0] is not None:
@@ -87,6 +87,7 @@ class Deconvolution1D(Layer):
                 x = tf.pad(x, ((0, 0), (0, self.padding[0]), (0, 0)))
         assert x.shape[1] == self.w_real.shape[-1], 'Input and kernels must have equal shapes. Reduce filters ' \
                                                     'length, use input padding or increase input length.'
+        # Perform Wiener deconvolution with trainable complex weights and SNRs
         x = deconv1d(input_vect=x, filters=(self.w_real, self.w_imag), lambds=self.s)
         # Apply bias accordingly
         if self.use_bias:

@@ -6,7 +6,8 @@ from tensorflow.python.keras import backend as bend
 def outer_elementwise(a, b):
     """
     It takes two tensors, `a` and `b`, and returns a tensor of the same shape as `a` where each element is the product
-    of the corresponding element in `a` and the corresponding element in `b`
+    of the corresponding element in `a` and the corresponding element in `b`, or the corresponding outer element-wise
+    product
     :param a: (batch_size, timestamps, features)
     :param b: (features, len_features)
     """
@@ -16,7 +17,7 @@ def outer_elementwise(a, b):
 @tf.function
 def expand_tensor_dims_recursive(inputs, expand_iters=1, axis=0):
     """
-    It takes a tensor and expands its dimensions by a specified number of times
+    It takes a tensor and expands its dimensions by a specified number of times along a given axis
     :param inputs: the tensor to expand
     :param expand_iters: The number of times to expand the dimensions of the tensor, defaults to 1 (optional)
     :param axis: The axis to expand the dimensions of the tensor, defaults to 0 (optional)
@@ -56,14 +57,14 @@ def deconv1d(input_vect, filters, lambds):
     lambds = real_to_complex_tensor(lambds)
     # Generate the FFT of filter's transfer function
     fft_filters = tf.signal.fft(tf.complex(filters[0], filters[-1]))
-    # Parse all the features of the batches, FFT them and perform deconvolution
     # FFT all the signal batches of corresponding feature_idx
     fft_input = tf.signal.fft(input_vect)
     # Compute simple Wiener deconvolution
     deconvolved = tf.math.real(tf.signal.ifft(outer_elementwise(fft_input, (tf.math.conj(fft_filters) /
                                               (fft_filters * tf.math.conj(fft_filters) + lambds**2)))))
     # Reshape the resulted deconvoluted maps to normal shape of (batch, timestamps, features) where number of features
-    # now is the product of initial features times the number of deconvolution filters
+    # now is the product of initial features times the number of deconvolution filters (from each independent signal
+    # results a set of deconvoluted signals equal to the number of filters)
     return tf.reshape(deconvolved, (bend.shape(input_vect)[0],
                                     bend.shape(input_vect)[1],
                                     bend.shape(input_vect)[-1] * bend.shape(filters[0])[0]))

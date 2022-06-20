@@ -10,7 +10,7 @@ from tensorflow.python.keras.engine.base_layer import Layer
 from nn_ops_extent.ops_extent import deconv1d
 
 
-class Deconvolution(Layer):
+class Deconvolution1D(Layer):
     def __init__(self,
                  filters,
                  kernel_size,
@@ -27,7 +27,7 @@ class Deconvolution(Layer):
                  trainable=True,
                  name=None,
                  **kwargs):
-        super(Deconvolution, self).__init__(
+        super(Deconvolution1D, self).__init__(
             trainable=trainable,
             name=name,
             activity_regularizer=regularizers.get(activity_regularizer),
@@ -99,9 +99,9 @@ class Deconvolution(Layer):
     def _pad_filters2match_input(self, input_shape):
         # Determine pad length
         if self.padding[0] is not None:
-            len_pad = input_shape[1] + self.padding[0] - self.w_real.shape[-1]
+            len_pad = input_shape[1] + self.padding[0] - self.kernel_size[0]
         else:
-            len_pad = input_shape[1] - self.w_real.shape[-1]
+            len_pad = input_shape[1] - self.kernel_size[0]
         # Pad both real and imaginary weights
         if len_pad > 0:
             self.w_real = tf.pad(self.w_real, ((0, 0), (0, len_pad)), 'constant')
@@ -114,4 +114,4 @@ class Deconvolution(Layer):
         pass
 
 
-Deconv1D = Deconvolution
+Deconv1D = Deconvolution1D

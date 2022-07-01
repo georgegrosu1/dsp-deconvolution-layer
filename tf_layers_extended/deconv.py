@@ -1,16 +1,14 @@
 import copy
 
 import tensorflow as tf
-from tensorflow.python.keras import backend as bend
-from tensorflow.python.keras import initializers
-from tensorflow.python.keras import regularizers
-from tensorflow.python.keras import activations
-from tensorflow.python.framework import tensor_shape
-from tensorflow.python.keras.engine.base_layer import Layer
+from tensorflow.keras import backend as bend
+from tensorflow.keras import initializers
+from tensorflow.keras import regularizers
+from tensorflow.keras import activations
 from nn_ops_extent.ops_extent import deconv1d
 
 
-class Deconvolution1D(Layer):
+class Deconvolution1D(tf.keras.layers.Layer):
     def __init__(self,
                  filters,
                  kernel_size,
@@ -49,7 +47,7 @@ class Deconvolution1D(Layer):
         self.b = None
 
     def build(self, input_shape):
-        input_shape = tensor_shape.TensorShape(input_shape)
+        input_shape = tf.TensorShape(input_shape)
         self.w_real = self.add_weight(shape=(self.filters, self.kernel_size[0]),
                                       initializer=self.kernel_initializer,
                                       regularizer=self.kernel_regularizer,

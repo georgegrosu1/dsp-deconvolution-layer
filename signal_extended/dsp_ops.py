@@ -9,7 +9,7 @@ def power_spectrum(series, sides='two'):
     # TODO: Verify if it is required to detrend the series by mean
     # series -= tf.reshape(tf.math.reduce_mean(series, axis=-1), (series.shape[0], 1))
     # Set default sampling frequency to 1KHz times number of samples
-    freq_s = 1e3 * series.shape[-1]
+    freq_s = 1e3 * float(tf.shape(series)[-1])
     # tf.signal.fft requires complex values
     signal = tf.cast(series, tf.complex64)
     # Take FFT
@@ -19,7 +19,7 @@ def power_spectrum(series, sides='two'):
         # Need just positive or negative freq
         signal = signal[:, :(signal.shape[-1] // 2 + 1)]
     # Compute the power
-    signal = (1 / freq_s * series.shape[-1]) * tf.math.abs(signal)**2
+    signal = (1.0 / freq_s * float(tf.shape(series)[-1])) * tf.math.abs(signal)**2
     signal = tf.concat([tf.expand_dims(signal[:, 0], axis=-1),
                         signal[:, 1:-1]*2,
                         tf.expand_dims(signal[:, -1], axis=-1)], axis=-1)

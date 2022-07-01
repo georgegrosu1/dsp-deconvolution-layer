@@ -1,5 +1,4 @@
 import tensorflow as tf
-from tensorflow.python.keras import backend as bend
 
 
 @tf.function
@@ -24,8 +23,8 @@ def expand_tensor_dims_recursive(inputs, expand_iters=1, axis=0):
     :return: A tensor with the same data as inputs but with a new dimension inserted at the specified position.
     """
     if expand_iters == 1:
-        return bend.expand_dims(inputs, axis)
-    inputs = bend.expand_dims(inputs, axis)
+        return tf.expand_dims(inputs, axis)
+    inputs = tf.expand_dims(inputs, axis)
     return expand_tensor_dims_recursive(inputs, expand_iters-1, axis)
 
 
@@ -65,6 +64,6 @@ def deconv1d(input_vect, filters, lambds):
     # Reshape the resulted deconvoluted maps to normal shape of (batch, timestamps, features) where number of features
     # now is the product of initial features times the number of deconvolution filters (from each independent signal
     # results a set of deconvoluted signals equal to the number of filters)
-    return tf.reshape(deconvolved, (bend.shape(input_vect)[0],
-                                    bend.shape(input_vect)[1],
-                                    bend.shape(input_vect)[-1] * bend.shape(filters[0])[0]))
+    return tf.reshape(deconvolved, (tf.shape(input_vect)[0],
+                                    tf.shape(input_vect)[1],
+                                    tf.shape(input_vect)[-1] * tf.shape(filters[0])[0]))

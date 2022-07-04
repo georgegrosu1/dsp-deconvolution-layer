@@ -40,6 +40,7 @@ class Deconvolution1D(tf.keras.layers.Layer):
         self.kernel_regularizer = regularizers.get(kernel_regularizer)
         self.lambd_regularizer = regularizers.get(lambd_regularizer)
         self.bias_regularizer = regularizers.get(bias_regularizer)
+        self._bias_regularizer = bias_regularizer
         self.use_bias = use_bias
         self.w_real = None
         self.w_imag = None
@@ -52,23 +53,27 @@ class Deconvolution1D(tf.keras.layers.Layer):
                                       initializer=self.kernel_initializer,
                                       regularizer=self.kernel_regularizer,
                                       trainable=True,
+                                      name='w_real',
                                       dtype='float32')
         self.w_imag = self.add_weight(shape=self.w_real.shape,
                                       initializer=self.kernel_initializer,
                                       regularizer=self.kernel_regularizer,
                                       trainable=True,
+                                      name='w_imag',
                                       dtype='float32')
         self._pad_filters2match_input(input_shape)
         self.s = self.add_weight(shape=(self.filters, 1),
                                  initializer=self.lambd_initializer,
                                  regularizer=self.lambd_regularizer,
                                  trainable=True,
+                                 name='snr',
                                  dtype='float32')
         if self.use_bias:
             self.b = self.add_weight(shape=(1, self.filters * input_shape[-1]),
                                      initializer=self.bias_initializer,
                                      regularizer=self.bias_regularizer,
                                      trainable=True,
+                                     name='bias',
                                      dtype='float32')
 
     @tf.function
@@ -94,6 +99,24 @@ class Deconvolution1D(tf.keras.layers.Layer):
         if self.activation is not None:
             x = self.activation(x)
         return x
+
+    def get_config(self):
+        config = super().get_config().copy()
+        config.update({
+            'filters': self.filters,
+            'kernel_size': self.kernel_size,
+            'padding': self.padding,
+            'activation': activations.serialize(self.activation),
+            'use_bias': self.use_bias,
+            'kernel_initializer': initializers.serialize(self.kernel_initializer),
+            'lambd_initializer':  initializers.serialize(self.lambd_initializer),
+            'bias_initializer':  initializers.serialize(self.bias_initializer),
+            'kernel_regularizer': regularizers.serialize(self.kernel_regularizer),
+            'lambd_regularizer': regularizers.serialize(self.lambd_regularizer),
+            'bias_regularizer': regularizers.serialize(self.bias_regularizer),
+            'activity_regularizer': regularizers.serialize(self.activity_regularizer)
+        })
+        return config
 
     def _pad_filters2match_input(self, input_shape):
         # Determine pad length

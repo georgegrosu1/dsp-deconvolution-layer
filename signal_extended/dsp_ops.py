@@ -16,7 +16,7 @@ def power_spectrum(series, sides='two'):
     # Consider sides
     if sides == 'one':
         # Need just positive or negative freq
-        signal = signal[:, :(signal.shape[-1] // 2 + 1)]
+        signal = signal[:, :(tf.shape(signal)[-1] // 2 + 1)]
     # Compute the power
     signal = (1.0 / float(tf.shape(series)[-1])) * tf.math.abs(signal)**2
     signal = tf.concat([tf.expand_dims(signal[:, 0], axis=-1),

@@ -2,15 +2,16 @@ import tensorflow as tf
 
 
 @tf.function
-def outer_elementwise(a, b):
+def outer_elementwise(a, b, perm_order):
     """
     It takes two tensors, `a` and `b`, and returns a tensor of the same shape as `a` where each element is the product
     of the corresponding element in `a` and the corresponding element in `b`, or the corresponding outer element-wise
     product
+    :param perm: Tuple to indicate transposing order
     :param a: (batch_size, timestamps, features)
     :param b: (features, len_features)
     """
-    return tf.multiply(tf.transpose(a, perm=(0, 2, 1)), tf.expand_dims(tf.expand_dims(b, axis=1), axis=1))
+    return tf.multiply(tf.transpose(a, perm=perm_order), tf.expand_dims(tf.expand_dims(b, axis=1), axis=1))
 
 
 @tf.function
@@ -60,10 +61,35 @@ def deconv1d(input_vect, filters, lambds):
     fft_input = tf.signal.fft(input_vect)
     # Compute simple Wiener deconvolution
     deconvolved = tf.math.real(tf.signal.ifft(outer_elementwise(fft_input, (tf.math.conj(fft_filters) /
-                                              (fft_filters * tf.math.conj(fft_filters) + lambds**2)))))
+                                              (fft_filters * tf.math.conj(fft_filters) + lambds**2)), perm=(0, 2, 1))))
     # Reshape the resulted deconvoluted maps to normal shape of (batch, timestamps, features) where number of features
     # now is the product of initial features times the number of deconvolution filters (from each independent signal
     # results a set of deconvoluted signals equal to the number of filters)
     return tf.reshape(deconvolved, (tf.shape(input_vect)[0],
                                     tf.shape(input_vect)[1],
                                     tf.shape(input_vect)[-1] * tf.shape(filters[0])[0]))
+
+
+@tf.function
+def deconv2d(input_mat, filters, lambds):
+    # Match SNRs & filters shape
+    lambds = tf.broadcast_to(lambds[:, None], (tf.shape(lambds)[0], tf.shape(input_mat)[1], tf.shape(input_mat)[2]))
+
+    # Complete possibly real input vector with zeros for imaginary parts
+    input_mat = real_to_complex_tensor(input_mat)
+    lambds = real_to_complex_tensor(lambds)
+
+    # Generate the FFT of filter's transfer function and input matrixes
+    fft_filters = tf.signal.fft2d(filters)
+    fft_input = tf.signal.fft2d(input_mat)
+
+    # Compute simple Wiener deconvolution
+    deconvolved = tf.math.real(tf.signal.ifft(outer_elementwise(fft_input, (tf.math.conj(fft_filters) /
+                                                                            (fft_filters * tf.math.conj(fft_filters) +
+                                                                             lambds ** 2)), perm=(0, 3, 2, 1))))
+
+    return tf.reshape(deconvolved, (tf.shape(input_mat)[0],
+                                    tf.shape(input_mat)[1],
+                                    tf.shape(input_mat)[2],
+                                    tf.shape(input_mat)[-1] * tf.shape(filters)[0]))
+

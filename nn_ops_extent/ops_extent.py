@@ -7,7 +7,7 @@ def outer_elementwise(a, b, perm_order):
     It takes two tensors, `a` and `b`, and returns a tensor of the same shape as `a` where each element is the product
     of the corresponding element in `a` and the corresponding element in `b`, or the corresponding outer element-wise
     product
-    :param perm: Tuple to indicate transposing order
+    :param perm_order: Tuple to indicate transposing order
     :param a: (batch_size, timestamps, features)
     :param b: (features, len_features)
     """
@@ -72,11 +72,26 @@ def deconv1d(input_vect, filters, lambds):
 
 @tf.function
 def deconv2d(input_mat, filters, lambds):
+    """
+    It takes the input matrix, the filters and the SNRs, and returns the deconvolved matrix
+    :param input_mat: the input matrix to be deconvolved of shape (batch, width, height, channels)
+    :param filters: the filter to be deconvolved of shape (width, height, #filters) - w & h must match with input_mat
+    :param lambds: The SNR of the input image of shape (#filters, 1)
+    :return: The deconvolved image.
+    """
+    # Store initial shape for later reconstruction to conventional shape
+    init_shape = tf.shape(input_mat)
+
     # Match SNRs & filters shape
     lambds = tf.broadcast_to(lambds[:, None], (tf.shape(lambds)[0], tf.shape(input_mat)[1], tf.shape(input_mat)[2]))
 
+    # Transpose input matrices for propper form to apply FFT2D
+    input_mat = tf.transpose(input_mat, perm=[0, 3, 1, 2])
+    filters = tf.transpose(filters, perm=[2, 0, 1])
+
     # Complete possibly real input vector with zeros for imaginary parts
     input_mat = real_to_complex_tensor(input_mat)
+    filters = real_to_complex_tensor(filters)
     lambds = real_to_complex_tensor(lambds)
 
     # Generate the FFT of filter's transfer function and input matrixes
@@ -86,10 +101,13 @@ def deconv2d(input_mat, filters, lambds):
     # Compute simple Wiener deconvolution
     deconvolved = tf.math.real(tf.signal.ifft(outer_elementwise(fft_input, (tf.math.conj(fft_filters) /
                                                                             (fft_filters * tf.math.conj(fft_filters) +
-                                                                             lambds ** 2)), perm=(0, 3, 2, 1))))
+                                                                             lambds ** 2)), perm=(0, 1, 3, 2))))
 
-    return tf.reshape(deconvolved, (tf.shape(input_mat)[0],
-                                    tf.shape(input_mat)[1],
-                                    tf.shape(input_mat)[2],
-                                    tf.shape(input_mat)[-1] * tf.shape(filters)[0]))
+    # Make back to conventional shape of (batch, width, height, channels)
+    deconvolved = tf.transpose(deconvolved, perm=(1, 3, 4, 2, 0))
+    deconvolved = tf.reshape(deconvolved, (init_shape[0],
+                                           init_shape[1],
+                                           init_shape[2],
+                                           init_shape[-1] * tf.shape(filters)[0]))
 
+    return deconvolved

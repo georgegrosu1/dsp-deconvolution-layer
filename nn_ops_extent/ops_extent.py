@@ -102,7 +102,7 @@ def deconv2d(input_mat, filters, lambds):
     # Compute simple Wiener deconvolution
     deconvolved = tf.math.real(tf.signal.ifft(outer_elementwise(fft_input, (tf.math.conj(fft_filters) /
                                                                             (fft_filters * tf.math.conj(fft_filters) +
-                                                                             lambds ** 2)), perm_order=(0, 1, 3, 2))))
+                                                                             lambds ** 2)), perm_order=(0, 1, 2, 3))))
 
     # Make back to conventional shape of (batch, width, height, channels)
     deconvolved = tf.transpose(deconvolved, perm=(1, 3, 4, 2, 0))

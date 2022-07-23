@@ -257,7 +257,6 @@ class Deconvolution2D(AbstractDeconvolution):
                    ((0, 0), (self.padding[0][0], self.padding[0][1]), (self.padding[1][0], self.padding[1][1]), (0, 0)),
                    'constant')
 
-        print(x.shape, self.w.shape)
         assert (x.shape[1] == self.w.shape[0]) and (x.shape[2] == self.w.shape[1]), \
             'Input and kernels must have equal shapes. Reduce filters ' \
             'width/height, use input padding or increase input width/height.'

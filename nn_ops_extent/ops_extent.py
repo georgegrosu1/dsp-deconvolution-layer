@@ -11,7 +11,7 @@ def outer_elementwise(a, b, perm_order):
     :param a: (batch_size, timestamps, features)
     :param b: (features, len_features)
     """
-    return tf.multiply(tf.transpose(a, perm=perm_order), tf.expand_dims(tf.expand_dims(b, axis=1), axis=1))
+    return tf.multiply(tf.transpose(a, perm=perm_order), expand_tensor_dims_recursive(b, 2, 1))
 
 
 @tf.function

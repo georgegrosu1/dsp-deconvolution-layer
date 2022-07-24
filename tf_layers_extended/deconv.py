@@ -5,7 +5,7 @@ from tensorflow.keras import backend as bend
 from tensorflow.keras import initializers
 from tensorflow.keras import regularizers
 from tensorflow.keras import activations
-from nn_ops_extent.ops_extent import deconv1d, deconv2d
+from nn_ops_extent import deconv1d, deconv2d
 
 
 class AbstractDeconvolution(tf.keras.layers.Layer):

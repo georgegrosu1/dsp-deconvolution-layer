@@ -215,7 +215,7 @@ class Deconvolution2D(AbstractDeconvolution):
         if any(pad is not None for pad in unzipped_pads):
             assert all(pad is not None for pad in unzipped_pads), \
                 'Incomplete padding values. Please provide values for all padding positions of form ' \
-                '((width_left, width_right), (height_top, height_bottom))'
+                '((height_top, height_bottom), (width_left, width_right))'
         self.w = None
         self.s = None
         self.b = None
@@ -248,7 +248,7 @@ class Deconvolution2D(AbstractDeconvolution):
     @tf.function
     def call(self, inputs, *args, **kwargs):
         x = copy.copy(inputs)
-        # Make sure input shape corresponds to convention of (batch size, timestamps, features)
+        # Make sure input shape corresponds to convention of (batch size, height, width, channels)
         assert bend.ndim(x) == 4, f'Inputs shape must be of form (batch size, width, height, channels)' \
                                   f'yours is of form {bend.ndim(x)}'
 

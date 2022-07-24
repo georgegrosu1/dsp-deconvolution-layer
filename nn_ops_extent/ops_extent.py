@@ -76,7 +76,7 @@ def deconv2d(input_mat, filters, lambds):
     """
     It takes the input matrix, the filters and the SNRs, and returns the deconvolved matrix
     :param input_mat: the input matrix to be deconvolved of shape (batch, width, height, channels)
-    :param filters: the filter to be deconvolved of shape (width, height, #filters) - w & h must match with input_mat
+    :param filters: the filter to be deconvolved of shape (height, width, #filters) - h & w must match with input_mat
     :param lambds: The SNR of the input image of shape (#filters, 1)
     :return: The deconvolved image.
     """
@@ -104,7 +104,7 @@ def deconv2d(input_mat, filters, lambds):
                                                                             (fft_filters * tf.math.conj(fft_filters) +
                                                                              lambds ** 2)), perm_order=(0, 1, 2, 3))))
 
-    # Make back to conventional shape of (batch, width, height, channels)
+    # Make back to conventional shape of (batch, height, width, channels)
     deconvolved = tf.transpose(deconvolved, perm=(1, 3, 4, 2, 0))
     deconvolved = tf.reshape(deconvolved, (init_shape[0],
                                            init_shape[1],

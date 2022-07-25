@@ -80,38 +80,46 @@ def deconv2d(input_mat, filters, lambds):
     :param lambds: The SNR of the input image of shape (#filters, 1)
     :return: The deconvolved image.
     """
-    # Store initial shape for later reconstruction to conventional shape
-    init_shape = tf.shape(input_mat)
-
-    # Match SNRs & filters shape
-    lambds = tf.broadcast_to(lambds[:, None], (tf.shape(lambds)[0], tf.shape(input_mat)[1], tf.shape(input_mat)[2]))
 
     # Transpose input matrices for propper form to apply FFT2D
     input_mat = tf.transpose(input_mat, perm=[0, 3, 1, 2])
-    filters = tf.transpose(filters, perm=[2, 0, 1])
 
     # Complete possibly real input vector with zeros for imaginary parts
     input_mat = real_to_complex_tensor(input_mat)
     filters = real_to_complex_tensor(filters)
-    lambds = real_to_complex_tensor(lambds)
 
     # Generate the FFT of filter's transfer function and input matrixes
     fft_filters = tf.signal.fft2d(filters)
     fft_input = tf.signal.fft2d(input_mat)
 
-    # Compute simple Wiener deconvolution
-    deconvolved = tf.math.abs(tf.signal.ifft2d(outer_elementwise(fft_input, (tf.math.conj(fft_filters) /
-                                                                             (fft_filters * tf.math.conj(fft_filters) +
-                                                                              lambds ** 2)), perm_order=(0, 1, 2, 3))))
+    # Compute simple Wiener deconvolution method 1 kinda deprecated
+    # Match SNRs & filters shape
+    # lambds = real_to_complex_tensor(lambds)
+    # lambds = tf.broadcast_to(lambds[:, None], (tf.shape(lambds)[0], tf.shape(input_mat)[1], tf.shape(input_mat)[2]))
+    # deconvolved = tf.math.real(tf.signal.ifft2d(outer_elementwise(fft_input, (tf.math.conj(fft_filters) /
+    #                                                                          (fft_filters * tf.math.conj(fft_filters) +
+    #                                                                           lambds ** 2)), perm_order=(0, 1, 2, 3))))
+    # deconvolved = tf.reshape(deconvolved, (tf.shape(deconvolved)[1],
+    #                                                    tf.shape(deconvolved)[0] * tf.shape(deconvolved)[2],
+    #                                                    tf.shape(deconvolved)[3],
+    #                                                    tf.shape(deconvolved)[4]))
+
+    input_snr = tf.reduce_mean(tf.abs(fft_input) ** 2) / lambds
+
+    g_right_hand = (1 / (1 + 1 / ((tf.abs(fft_filters)**2) * input_snr)))
+    g_right_hand = tf.cast(g_right_hand, tf.complex64)
+
+    g_freq_domain = (1 / fft_filters) * g_right_hand
+
+    x_est_freq_domain = outer_elementwise(fft_input, g_freq_domain, perm_order=(0, 1, 2, 3))
+    x_est_freq_domain = tf.reshape(x_est_freq_domain, (tf.shape(x_est_freq_domain)[1],
+                                                       tf.shape(x_est_freq_domain)[0] * tf.shape(x_est_freq_domain)[2],
+                                                       tf.shape(x_est_freq_domain)[3],
+                                                       tf.shape(x_est_freq_domain)[4]))
+
+    deconvolved = tf.math.real(tf.signal.ifft2d(x_est_freq_domain))
 
     # Make back to conventional shape of (batch, height, width, channels)
-    deconvolved = tf.transpose(deconvolved, perm=(1, 3, 4, 2, 0))
-    deconvolved = deconvolved[:, :tf.shape(deconvolved)[1]//2, :, :, :]
-    deconvolved = tf.reshape(deconvolved, (tf.shape(deconvolved)[0],
-                                           tf.shape(deconvolved)[1],
-                                           tf.shape(deconvolved)[2],
-                                           tf.shape(deconvolved)[-2] * tf.shape(deconvolved)[-1]))
-
-    deconvolved = tf.image.resize(deconvolved, (tf.shape(deconvolved)[2], tf.shape(deconvolved)[2]))
+    deconvolved = tf.transpose(deconvolved, perm=(0, 2, 3, 1))
 
     return deconvolved

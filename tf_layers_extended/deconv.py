@@ -222,16 +222,16 @@ class Deconvolution2D(AbstractDeconvolution):
 
     def build(self, input_shape):
         input_shape = tf.TensorShape(input_shape)
-        self.w = self.add_weight(shape=(input_shape[1] + self.padding[0][0] + self.padding[0][1],
-                                        input_shape[2] + self.padding[1][0] + self.padding[1][1],
-                                        self.filters),
+        self.w = self.add_weight(shape=(self.filters,
+                                        input_shape[1] + self.padding[0][0] + self.padding[0][1],
+                                        input_shape[2] + self.padding[1][0] + self.padding[1][1]),
                                  initializer=self.kernel_initializer,
                                  regularizer=self.kernel_regularizer,
                                  trainable=True,
                                  name='w',
                                  dtype='float32')
 
-        self.s = self.add_weight(shape=(self.filters, 1),
+        self.s = self.add_weight(shape=(1, ),
                                  initializer=self.lambd_initializer,
                                  regularizer=self.lambd_regularizer,
                                  trainable=True,
@@ -257,7 +257,7 @@ class Deconvolution2D(AbstractDeconvolution):
                    ((0, 0), (self.padding[0][0], self.padding[0][1]), (self.padding[1][0], self.padding[1][1]), (0, 0)),
                    'constant')
 
-        assert (x.shape[1] == self.w.shape[0]) and (x.shape[2] == self.w.shape[1]), \
+        assert (x.shape[1] == self.w.shape[1]) and (x.shape[2] == self.w.shape[2]), \
             'Input and kernels must have equal shapes. Reduce filters ' \
             'width/height, use input padding or increase input width/height.'
 

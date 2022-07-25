@@ -100,15 +100,18 @@ def deconv2d(input_mat, filters, lambds):
     fft_input = tf.signal.fft2d(input_mat)
 
     # Compute simple Wiener deconvolution
-    deconvolved = tf.math.real(tf.signal.ifft(outer_elementwise(fft_input, (tf.math.conj(fft_filters) /
-                                                                            (fft_filters * tf.math.conj(fft_filters) +
-                                                                             lambds ** 2)), perm_order=(0, 1, 2, 3))))
+    deconvolved = tf.math.real(tf.signal.ifft2d(outer_elementwise(fft_input, (tf.math.conj(fft_filters) /
+                                                                              (fft_filters * tf.math.conj(fft_filters) +
+                                                                               lambds ** 2)), perm_order=(0, 1, 2, 3))))
 
     # Make back to conventional shape of (batch, height, width, channels)
     deconvolved = tf.transpose(deconvolved, perm=(1, 3, 4, 2, 0))
-    deconvolved = tf.reshape(deconvolved, (init_shape[0],
-                                           init_shape[1],
-                                           init_shape[2],
-                                           init_shape[-1] * tf.shape(filters)[0]))
+    deconvolved = deconvolved[:, :tf.shape(deconvolved)[1]//2, :, :, :]
+    deconvolved = tf.reshape(deconvolved, (tf.shape(deconvolved)[0],
+                                           tf.shape(deconvolved)[1],
+                                           tf.shape(deconvolved)[2],
+                                           tf.shape(deconvolved)[-2] * tf.shape(deconvolved)[-1]))
+
+    deconvolved = tf.image.resize(deconvolved, (tf.shape(deconvolved)[2], tf.shape(deconvolved)[2]))
 
     return deconvolved

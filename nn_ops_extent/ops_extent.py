@@ -183,9 +183,7 @@ def denoise_tv_chambolle_nd(image, weights, max_num_iter=200):
             d_p_ax2 = d[slice_d_ax2] + p[slice_p_ax2]
             d = tf.concat([d[conct_d_ax2], d_p_ax2], axis=2)
 
-            out = image + d
-        else:
-            out = image
+            out = image + d * tf.cast((i != 0), d.dtype)
 
         # g stores the gradients of out along each axis
         # e.g. g[0] is the first order finite difference along axis 0

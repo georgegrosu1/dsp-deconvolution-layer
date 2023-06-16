@@ -8,7 +8,7 @@ from tensorflow.keras import activations
 from nn_ops_extent import deconv1d, deconv2d
 
 
-class AbstractDeconvolution(tf.keras.layers.Layer):
+class WienerAbstractDeconvolution(tf.keras.layers.Layer):
     def __init__(self,
                  filters,
                  kernel_size,
@@ -37,7 +37,7 @@ class AbstractDeconvolution(tf.keras.layers.Layer):
         self.bias_regularizer = regularizers.get(bias_regularizer)
         self.use_bias = use_bias
 
-        super(AbstractDeconvolution, self).__init__(
+        super(WienerAbstractDeconvolution, self).__init__(
             trainable=trainable,
             name=name,
             activity_regularizer=regularizers.get(activity_regularizer),
@@ -74,7 +74,7 @@ class AbstractDeconvolution(tf.keras.layers.Layer):
         return config
 
 
-class Deconvolution1D(AbstractDeconvolution):
+class WienerDeconvolution1D(WienerAbstractDeconvolution):
     def __init__(self,
                  filters: int,
                  kernel_size: tuple,
@@ -91,7 +91,7 @@ class Deconvolution1D(AbstractDeconvolution):
                  trainable=True,
                  name=None,
                  **kwargs):
-        super(Deconvolution1D, self).__init__(
+        super(WienerDeconvolution1D, self).__init__(
             filters=filters,
             kernel_size=kernel_size,
             padding=padding,
@@ -177,7 +177,7 @@ class Deconvolution1D(AbstractDeconvolution):
             self.w_imag = tf.pad(self.w_imag, ((0, 0), (0, len_pad)), 'constant')
 
 
-class Deconvolution2D(AbstractDeconvolution):
+class WienerDeconvolution2D(WienerAbstractDeconvolution):
 
     def __init__(self,
                  filters: int,
@@ -195,7 +195,7 @@ class Deconvolution2D(AbstractDeconvolution):
                  trainable=True,
                  name=None,
                  **kwargs):
-        super(Deconvolution2D, self).__init__(
+        super(WienerDeconvolution2D, self).__init__(
             filters=filters,
             kernel_size=kernel_size,
             padding=padding,
@@ -281,5 +281,5 @@ class Deconvolution2D(AbstractDeconvolution):
         pass
 
 
-Deconv1D = Deconvolution1D
-Deconv2D = Deconvolution2D
+WienerDeconv1D = WienerDeconvolution1D
+WienerDeconv2D = WienerDeconvolution2D

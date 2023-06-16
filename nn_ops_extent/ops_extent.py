@@ -26,7 +26,7 @@ def expand_tensor_dims_recursive(inputs, expand_iters=1, axis=0):
     if expand_iters == 1:
         return tf.expand_dims(inputs, axis)
     inputs = tf.expand_dims(inputs, axis)
-    return expand_tensor_dims_recursive(inputs, expand_iters-1, axis)
+    return expand_tensor_dims_recursive(inputs, expand_iters - 1, axis)
 
 
 @tf.function
@@ -61,7 +61,8 @@ def deconv1d(input_vect, filters, lambds):
     fft_input = tf.signal.fft(input_vect)
     # Compute simple Wiener deconvolution
     deconvolved = tf.math.real(tf.signal.ifft(outer_elementwise(fft_input, (tf.math.conj(fft_filters) /
-                                              (fft_filters * tf.math.conj(fft_filters) + lambds**2)),
+                                                                            (fft_filters * tf.math.conj(
+                                                                                fft_filters) + lambds ** 2)),
                                                                 perm_order=(0, 2, 1))))
     # Reshape the resulted deconvoluted maps to normal shape of (batch, timestamps, features) where number of features
     # now is the product of initial features times the number of deconvolution filters (from each independent signal
@@ -106,7 +107,7 @@ def deconv2d(input_mat, filters, lambds):
 
     input_snr = tf.reduce_mean(tf.abs(fft_input) ** 2) / lambds
 
-    g_right_hand = (1 / (1 + 1 / ((tf.abs(fft_filters)**2) * input_snr)))
+    g_right_hand = (1 / (1 + 1 / ((tf.abs(fft_filters) ** 2) * input_snr)))
     g_right_hand = tf.cast(g_right_hand, tf.complex64)
 
     g_freq_domain = (1 / fft_filters) * g_right_hand
@@ -123,3 +124,87 @@ def deconv2d(input_mat, filters, lambds):
     deconvolved = tf.transpose(deconvolved, perm=(0, 2, 3, 1))
 
     return deconvolved
+
+
+@tf.function
+def denoise_tv_chambolle_nd(image, weights, max_num_iter=200):
+    """Perform total-variation denoising on n-dimensional images.
+    Parameters
+    ----------
+    :param image : ndarray
+        n-D input data to be denoised.
+    :param weights: 1D tensor with the weights for each channel
+        Denoising weight. The greater `weight`, the more denoising (at
+        the expense of fidelity to `input`).
+    :param max_num_iter : int
+        Maximal number of iterations used for the optimization.
+    Returns
+    -------
+    out : ndarray
+        Denoised array of floats.
+    Notes
+    -----
+    Rudin, Osher and Fatemi algorithm.
+
+    """
+
+    assert weights.shape[0] == image.shape[-1] or weights.shape[0] == 1, \
+        'Weights must have same size 1 or equal with number of image channels'
+
+    ndim = image.get_shape().ndims
+    weights = tf.cast(weights, image.dtype)
+
+    p = tf.zeros((ndim,) + image.shape, dtype=image.dtype)
+    out = tf.zeros_like(image)
+
+    slice_d_ax0 = [slice(1, None, None), slice(None, None, None), slice(None, None, None)]
+    conct_d_ax0 = [slice(None, 1, None), slice(None, None, None), slice(None, None, None)]
+    slice_p_ax0 = [0, slice(0, -1, None), slice(None, None, None), slice(None, None, None)]
+
+    slice_d_ax1 = [slice(None, None, None), slice(1, None, None), slice(None, None, None)]
+    conct_d_ax1 = [slice(None, None, None), slice(None, 1, None), slice(None, None, None)]
+    slice_p_ax1 = [1, slice(None, None, None), slice(0, -1, None), slice(None, None, None)]
+
+    slice_d_ax2 = [slice(None, None, None), slice(None, None, None), slice(1, None, None)]
+    conct_d_ax2 = [slice(None, None, None), slice(None, None, None), slice(None, 1, None)]
+    slice_p_ax2 = [2, slice(None, None, None), slice(None, None, None), slice(0, -1, None)]
+
+    for i in tf.range(max_num_iter):
+        if i > 0:
+            # d will be the (negative) divergence of p
+            d = tf.reduce_sum(-p, 0)
+
+            d_p_ax0 = d[slice_d_ax0] + p[slice_p_ax0]
+            d = tf.concat([d[conct_d_ax0], d_p_ax0], axis=0)
+
+            d_p_ax1 = d[slice_d_ax1] + p[slice_p_ax1]
+            d = tf.concat([d[conct_d_ax1], d_p_ax1], axis=1)
+
+            d_p_ax2 = d[slice_d_ax2] + p[slice_p_ax2]
+            d = tf.concat([d[conct_d_ax2], d_p_ax2], axis=2)
+
+            out = image + d
+        else:
+            out = image
+
+        # g stores the gradients of out along each axis
+        # e.g. g[0] is the first order finite difference along axis 0
+        diff_g_ax0 = tf.experimental.numpy.diff(out, axis=0)
+        diff_g_ax0 = tf.pad(diff_g_ax0, [[0, 1], [0, 0], [0, 0]])
+
+        diff_g_ax1 = tf.experimental.numpy.diff(out, axis=1)
+        diff_g_ax1 = tf.pad(diff_g_ax1, [[0, 0], [0, 1], [0, 0]])
+
+        diff_g_ax2 = tf.experimental.numpy.diff(out, axis=2)
+        diff_g_ax2 = tf.pad(diff_g_ax2, [[0, 0], [0, 0], [0, 1]])
+
+        g = tf.concat([[diff_g_ax0], [diff_g_ax1], [diff_g_ax2]], axis=0)
+
+        norm = tf.sqrt(tf.reduce_sum(g ** 2, axis=0))[None, ...]
+        tau = 1. / (2. * ndim)
+        norm *= tau / weights
+        norm += 1.
+        p = p - tau * g
+        p = p / norm
+
+    return out

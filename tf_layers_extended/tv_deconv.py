@@ -57,7 +57,7 @@ class TVAbstractDeconvolution(tf.keras.layers.Layer):
         config = super().get_config().copy()
         config.update({
             'max_iters': self.max_iters,
-            'lambdas_mode': self.num_lambdas,
+            'lambdas_mode': self.lambdas_mode,
             'activation': activations.serialize(self.activation),
             'use_bias': self.use_bias,
             'lambdas_initializer': initializers.serialize(self.lambdas_initializer),
@@ -101,9 +101,11 @@ class TVDeconvolution2D(TVAbstractDeconvolution):
 
         self.lambdas = None
         self.b = None
+        self.batch_size = None
 
     def build(self, input_shape):
         input_shape = tf.TensorShape(input_shape)
+        self.batch_size = input_shape[0]
 
         if self.lambdas_mode == 'unit':
             self.lambdas = self.add_weight(shape=(1, 1),
@@ -138,11 +140,11 @@ class TVDeconvolution2D(TVAbstractDeconvolution):
                                      name='bias',
                                      dtype='float32')
 
-    @tf.function(reduce_retracing=True)
+    @tf.function
     def call(self, inputs, *args, **kwargs):
         x = tf.cast(inputs, tf.float32)
         # Make sure input shape corresponds to convention of (batch size, timestamps, features)
-        assert x.get_shape().ndims == 3, f'Inputs shape must be of form (batch size, #timestamps, #features, ' \
+        assert x.get_shape().ndims == 4, f'Inputs shape must be of form (batch size, #timestamps, #features, ' \
                                          f'yours is of form {x.get_shape().ndims}'
 
         x = denoise_tv_chambolle_nd(image=x, weights=self.lambdas, max_num_iter=self.max_iters)

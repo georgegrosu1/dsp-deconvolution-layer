@@ -129,58 +129,62 @@ def denoise_tv_chambolle_nd(image, weights, max_num_iter=200):
     :return out : ndarray; Denoised array of floats.
     ----------
     """
-    assert weights.shape[0] == image.shape[-1] or weights.shape[0] == 1 or weights.shape == image.shape, \
+    assert weights.shape[0] == image.shape[-1] or weights.shape[0] == 1 or weights.shape == image.shape[1:], \
         'Weights must have same size 1 or equal with number of image channels'
 
-    ndim = image.get_shape().ndims
-    weights = tf.cast(weights, image.dtype)
+    input_shape = image.get_shape()
+    ndim = input_shape.ndims
+    p_shape = tf.TensorShape([input_shape[0], ndim - 1, input_shape[1], input_shape[2], input_shape[-1]])
 
-    p = tf.zeros((ndim,) + image.shape, dtype=image.dtype)
+    p = tf.zeros(p_shape, dtype=image.dtype)
     out = tf.zeros_like(image)
 
     # Set slicing objects in advance to compute divergence for each iteration
-    slice_d_ax0 = [slice(1, None, None), slice(None, None, None), slice(None, None, None)]
-    conct_d_ax0 = [slice(None, 1, None), slice(None, None, None), slice(None, None, None)]
-    slice_p_ax0 = [0, slice(0, -1, None), slice(None, None, None), slice(None, None, None)]
+    slice_d_ax0 = [slice(None, None, None), slice(1, None, None), slice(None, None, None), slice(None, None, None)]
+    conct_d_ax0 = [slice(None, None, None), slice(None, 1, None), slice(None, None, None), slice(None, None, None)]
+    slice_p_ax0 = [slice(None, None, None), 0, slice(0, -1, None), slice(None, None, None), slice(None, None, None)]
 
-    slice_d_ax1 = [slice(None, None, None), slice(1, None, None), slice(None, None, None)]
-    conct_d_ax1 = [slice(None, None, None), slice(None, 1, None), slice(None, None, None)]
-    slice_p_ax1 = [1, slice(None, None, None), slice(0, -1, None), slice(None, None, None)]
+    slice_d_ax1 = [slice(None, None, None), slice(None, None, None), slice(1, None, None), slice(None, None, None)]
+    conct_d_ax1 = [slice(None, None, None), slice(None, None, None), slice(None, 1, None), slice(None, None, None)]
+    slice_p_ax1 = [slice(None, None, None), 1, slice(None, None, None), slice(0, -1, None), slice(None, None, None)]
 
-    slice_d_ax2 = [slice(None, None, None), slice(None, None, None), slice(1, None, None)]
-    conct_d_ax2 = [slice(None, None, None), slice(None, None, None), slice(None, 1, None)]
-    slice_p_ax2 = [2, slice(None, None, None), slice(None, None, None), slice(0, -1, None)]
+    slice_d_ax2 = [slice(None, None, None), slice(None, None, None), slice(None, None, None), slice(1, None, None)]
+    conct_d_ax2 = [slice(None, None, None), slice(None, None, None), slice(None, None, None), slice(None, 1, None)]
+    slice_p_ax2 = [slice(None, None, None), 2, slice(None, None, None), slice(None, None, None), slice(0, -1, None)]
 
     for i in tf.range(max_num_iter):
         if i > 0:
             # d will be the (negative) divergence of p
-            d = tf.reduce_sum(-p, 0)
+            d = tf.reduce_sum(-p, 1)
 
             d_p_ax0 = d[slice_d_ax0] + p[slice_p_ax0]
-            d = tf.concat([d[conct_d_ax0], d_p_ax0], axis=0)
+            d = tf.concat([d[conct_d_ax0], d_p_ax0], axis=1)
 
             d_p_ax1 = d[slice_d_ax1] + p[slice_p_ax1]
-            d = tf.concat([d[conct_d_ax1], d_p_ax1], axis=1)
+            d = tf.concat([d[conct_d_ax1], d_p_ax1], axis=2)
 
             d_p_ax2 = d[slice_d_ax2] + p[slice_p_ax2]
-            d = tf.concat([d[conct_d_ax2], d_p_ax2], axis=2)
+            d = tf.concat([d[conct_d_ax2], d_p_ax2], axis=3)
 
             out = image + d * tf.cast((i != 0), d.dtype)
 
-        # g stores the gradients of out along each axis of the image (0, 1, 2)
-        diff_g_ax0 = tf.experimental.numpy.diff(out, axis=0)
-        diff_g_ax0 = tf.pad(diff_g_ax0, [[0, 1], [0, 0], [0, 0]])
+        # g stores the gradients of out along each axis of the image (1, 2, 3)
+        diff_g_ax0 = tf.experimental.numpy.diff(out, axis=1)
+        diff_g_ax0 = tf.pad(diff_g_ax0, [[0, 0], [0, 1], [0, 0], [0, 0]])
 
-        diff_g_ax1 = tf.experimental.numpy.diff(out, axis=1)
-        diff_g_ax1 = tf.pad(diff_g_ax1, [[0, 0], [0, 1], [0, 0]])
+        diff_g_ax1 = tf.experimental.numpy.diff(out, axis=2)
+        diff_g_ax1 = tf.pad(diff_g_ax1, [[0, 0], [0, 0], [0, 1], [0, 0]])
 
-        diff_g_ax2 = tf.experimental.numpy.diff(out, axis=2)
-        diff_g_ax2 = tf.pad(diff_g_ax2, [[0, 0], [0, 0], [0, 1]])
+        diff_g_ax2 = tf.experimental.numpy.diff(out, axis=3)
+        diff_g_ax2 = tf.pad(diff_g_ax2, [[0, 0], [0, 0], [0, 0], [0, 1]])
 
         g = tf.concat([[diff_g_ax0], [diff_g_ax1], [diff_g_ax2]], axis=0)
 
-        norm = tf.sqrt(tf.reduce_sum(g ** 2, axis=0))[None, ...]
-        tau = 1. / (2. * ndim)
+        # Dimensions order must be rearranged
+        g = tf.transpose(g, perm=[1, 0, 2, 3, 4])
+
+        norm = tf.sqrt(tf.reduce_sum(g ** 2, axis=0))
+        tau = 1. / (2. * p_shape[1])
         norm *= tau / tf.sqrt(weights ** 2)
         norm += 1.
         p = p - tau * g

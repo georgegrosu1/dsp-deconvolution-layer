@@ -120,26 +120,15 @@ def deconv2d(input_mat, filters, lambds):
 
 @tf.function
 def denoise_tv_chambolle_nd(image, weights, max_num_iter=200):
-    """Perform total-variation denoising on n-dimensional images.
-    Parameters
+    """Perform total-variation denoising on n-dimensional images based on Rudin, Osher and Fatemi algorithm..
     ----------
-    :param image : ndarray
-        n-D input data to be denoised.
-    :param weights: 1D tensor with the weights for each channel
-        Denoising weight. The greater `weight`, the more denoising (at
-        the expense of fidelity to `input`).
-    :param max_num_iter : int
-        Maximal number of iterations used for the optimization.
-    Returns
-    -------
-    out : ndarray
-        Denoised array of floats.
-    Notes
-    -----
-    Rudin, Osher and Fatemi algorithm.
-
+    :param image : ndarray; n-D input data to be denoised.
+    :param weights: 1D tensor with the weights for each channel; Denoising weight. The greater `weight`, the more
+    denoising (at the expense of fidelity to `input`).
+    :param max_num_iter : int Maximal number of iterations used for the optimization.
+    :return out : ndarray; Denoised array of floats.
+    ----------
     """
-
     assert weights.shape[0] == image.shape[-1] or weights.shape[0] == 1 or weights.shape == image.shape, \
         'Weights must have same size 1 or equal with number of image channels'
 
@@ -149,6 +138,7 @@ def denoise_tv_chambolle_nd(image, weights, max_num_iter=200):
     p = tf.zeros((ndim,) + image.shape, dtype=image.dtype)
     out = tf.zeros_like(image)
 
+    # Set slicing objects in advance to compute divergence for each iteration
     slice_d_ax0 = [slice(1, None, None), slice(None, None, None), slice(None, None, None)]
     conct_d_ax0 = [slice(None, 1, None), slice(None, None, None), slice(None, None, None)]
     slice_p_ax0 = [0, slice(0, -1, None), slice(None, None, None), slice(None, None, None)]
@@ -177,8 +167,7 @@ def denoise_tv_chambolle_nd(image, weights, max_num_iter=200):
 
             out = image + d * tf.cast((i != 0), d.dtype)
 
-        # g stores the gradients of out along each axis
-        # e.g. g[0] is the first order finite difference along axis 0
+        # g stores the gradients of out along each axis of the image (0, 1, 2)
         diff_g_ax0 = tf.experimental.numpy.diff(out, axis=0)
         diff_g_ax0 = tf.pad(diff_g_ax0, [[0, 1], [0, 0], [0, 0]])
 

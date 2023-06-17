@@ -93,19 +93,11 @@ def deconv2d(input_mat, filters, lambds):
     fft_filters = tf.signal.fft2d(filters)
     fft_input = tf.signal.fft2d(input_mat)
 
-    # Compute simple Wiener deconvolution method 1 kinda deprecated
-    # Match SNRs & filters shape
-    # lambds = real_to_complex_tensor(lambds)
-    # lambds = tf.broadcast_to(lambds[:, None], (tf.shape(lambds)[0], tf.shape(input_mat)[1], tf.shape(input_mat)[2]))
-    # deconvolved = tf.math.real(tf.signal.ifft2d(outer_elementwise(fft_input, (tf.math.conj(fft_filters) /
-    #                                                                          (fft_filters * tf.math.conj(fft_filters) +
-    #                                                                           lambds ** 2)), perm_order=(0, 1, 2, 3))))
-    # deconvolved = tf.reshape(deconvolved, (tf.shape(deconvolved)[1],
-    #                                                    tf.shape(deconvolved)[0] * tf.shape(deconvolved)[2],
-    #                                                    tf.shape(deconvolved)[3],
-    #                                                    tf.shape(deconvolved)[4]))
-
+    # Compute simple Wiener deconvolution
     input_snr = tf.reduce_mean(tf.abs(fft_input) ** 2) / lambds
+    input_snr = tf.broadcast_to(input_snr[:, None, None], (fft_filters.shape[0],
+                                                           fft_filters.shape[1],
+                                                           fft_filters.shape[2]))
 
     g_right_hand = (1 / (1 + 1 / ((tf.abs(fft_filters) ** 2) * input_snr)))
     g_right_hand = tf.cast(g_right_hand, tf.complex64)

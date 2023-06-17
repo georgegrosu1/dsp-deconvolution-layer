@@ -1,5 +1,3 @@
-import copy
-
 import tensorflow as tf
 from tensorflow.keras import backend as bend
 from tensorflow.keras import initializers
@@ -8,23 +6,28 @@ from tensorflow.keras import activations
 from nn_ops_extent import denoise_tv_chambolle_nd
 
 
+class NonNegative(tf.keras.constraints.Constraint):
+    def __call__(self, w):
+        return w * tf.cast(tf.math.greater_equal(w, 0.), w.dtype)
+
+
 class TVAbstractDeconvolution(tf.keras.layers.Layer):
-    def __int__(self,
-                max_iters,
-                num_lambdas,
-                activation,
-                use_bias,
-                lambdas_initializer,
-                bias_initializer,
-                lambdas_regularizer,
-                bias_regularizer,
-                activity_regularizer,
-                trainable,
-                name,
-                **kwargs
-                ):
+    def __init__(self,
+                 max_iters,
+                 lambdas_mode,
+                 activation,
+                 use_bias,
+                 lambdas_initializer,
+                 bias_initializer,
+                 lambdas_regularizer,
+                 bias_regularizer,
+                 activity_regularizer,
+                 trainable,
+                 name,
+                 **kwargs
+                 ):
         self.max_iters = max_iters
-        self.num_lambdas = num_lambdas
+        self.lambdas_mode = lambdas_mode
         self.activation = activations.get(activation)
         self.lambdas_initializer = initializers.get(lambdas_initializer)
         self.bias_initializer = initializers.get(bias_initializer)
@@ -38,53 +41,53 @@ class TVAbstractDeconvolution(tf.keras.layers.Layer):
             activity_regularizer=regularizers.get(activity_regularizer),
             **kwargs)
 
-        def build(self, input_shape):
-            raise NotImplementedError
+    def build(self, input_shape):
+        raise NotImplementedError
 
-        def call(self, inputs, *args, **kwargs):
-            raise NotImplementedError
+    def call(self, inputs, *args, **kwargs):
+        raise NotImplementedError
 
-        def _serialize_to_tensors(self):
-            pass
+    def _serialize_to_tensors(self):
+        pass
 
-        def _restore_from_tensors(self, restored_tensors):
-            pass
+    def _restore_from_tensors(self, restored_tensors):
+        pass
 
-        def get_config(self):
-            config = super().get_config().copy()
-            config.update({
-                'max_iters': self.max_iters,
-                'num_lambdas': self.num_lambdas,
-                'activation': activations.serialize(self.activation),
-                'use_bias': self.use_bias,
-                'lambdas_initializer': initializers.serialize(self.lambdas_initializer),
-                'bias_initializer': initializers.serialize(self.bias_initializer),
-                'lambdas_regularizer': regularizers.serialize(self.lambdas_regularizer),
-                'bias_regularizer': regularizers.serialize(self.bias_regularizer),
-                'activity_regularizer': regularizers.serialize(self.activity_regularizer)
-            })
-            return config
+    def get_config(self):
+        config = super().get_config().copy()
+        config.update({
+            'max_iters': self.max_iters,
+            'lambdas_mode': self.num_lambdas,
+            'activation': activations.serialize(self.activation),
+            'use_bias': self.use_bias,
+            'lambdas_initializer': initializers.serialize(self.lambdas_initializer),
+            'bias_initializer': initializers.serialize(self.bias_initializer),
+            'lambdas_regularizer': regularizers.serialize(self.lambdas_regularizer),
+            'bias_regularizer': regularizers.serialize(self.bias_regularizer),
+            'activity_regularizer': regularizers.serialize(self.activity_regularizer),
+        })
+        return config
 
 
 class TVDeconvolution2D(TVAbstractDeconvolution):
 
     def __init__(self,
-                max_iters: int,
-                num_lambdas: int,
-                activation=None,
-                use_bias=True,
-                lambdas_initializer='glorot_normal',
-                bias_initializer='zeros',
-                lambdas_regularizer=None,
-                bias_regularizer=None,
-                activity_regularizer=None,
-                trainable=True,
-                name=None,
-                **kwargs):
+                 max_iters: int,
+                 lambdas_mode='unit',
+                 activation=None,
+                 use_bias=True,
+                 lambdas_initializer='lecun_normal',
+                 bias_initializer='zeros',
+                 lambdas_regularizer=None,
+                 bias_regularizer=None,
+                 activity_regularizer=None,
+                 trainable=True,
+                 name=None,
+                 **kwargs):
 
-        super(TVDeconvolution2D, self).__int__(
+        super(TVDeconvolution2D, self).__init__(
             max_iters=max_iters,
-            num_lambdas=num_lambdas,
+            lambdas_mode=lambdas_mode,
             activation=activation,
             use_bias=use_bias,
             lambdas_initializer=lambdas_initializer,
@@ -101,23 +104,43 @@ class TVDeconvolution2D(TVAbstractDeconvolution):
 
     def build(self, input_shape):
         input_shape = tf.TensorShape(input_shape)
-        self.lambdas = self.add_weight(shape=(self.num_lambdas, 1),
-                                       initializer=self.kernel_initializer,
-                                       regularizer=self.kernel_regularizer,
-                                       trainable=True,
-                                       name='lambdas',
-                                       dtype='float32')
+
+        if self.lambdas_mode == 'unit':
+            self.lambdas = self.add_weight(shape=(1, 1),
+                                           initializer=self.lambdas_initializer,
+                                           regularizer=self.lambdas_regularizer,
+                                           constraint=tf.keras.constraints.non_neg(),
+                                           trainable=True,
+                                           name='lambdas',
+                                           dtype='float32')
+        elif self.lambdas_mode == 'channel':
+            self.lambdas = self.add_weight(shape=(1, input_shape[-1]),
+                                           initializer=self.lambdas_initializer,
+                                           regularizer=self.lambdas_regularizer,
+                                           constraint=tf.keras.constraints.non_neg(),
+                                           trainable=True,
+                                           name='lambdas',
+                                           dtype='float32')
+        elif self.lambdas_mode == 'full':
+            self.lambdas = self.add_weight(shape=input_shape,
+                                           initializer=self.lambdas_initializer,
+                                           regularizer=self.lambdas_regularizer,
+                                           constraint=tf.keras.constraints.non_neg(),
+                                           trainable=True,
+                                           name='lambdas',
+                                           dtype='float32')
+
         if self.use_bias:
-            self.b = self.add_weight(shape=(1, input_shape[-1]),
+            self.b = self.add_weight(shape=(1, 1, input_shape[-1]),
                                      initializer=self.bias_initializer,
                                      regularizer=self.bias_regularizer,
                                      trainable=True,
                                      name='bias',
                                      dtype='float32')
 
-    @tf.function
+    @tf.function(reduce_retracing=True)
     def call(self, inputs, *args, **kwargs):
-        x = tf.constant(inputs, tf.float32)
+        x = tf.cast(inputs, tf.float32)
         # Make sure input shape corresponds to convention of (batch size, timestamps, features)
         assert x.get_shape().ndims == 3, f'Inputs shape must be of form (batch size, #timestamps, #features, ' \
                                          f'yours is of form {x.get_shape().ndims}'
@@ -127,9 +150,19 @@ class TVDeconvolution2D(TVAbstractDeconvolution):
         # Apply bias accordingly to resulted shape
         if self.use_bias:
             x = x + self.b
+            tf.print(self.b)
 
         # And activation
         if self.activation is not None:
             x = self.activation(x)
 
         return x
+
+    def _serialize_to_tensors(self):
+        pass
+
+    def _restore_from_tensors(self, restored_tensors):
+        pass
+
+
+TVDeconv2D = TVDeconvolution2D

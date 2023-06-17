@@ -148,7 +148,7 @@ def denoise_tv_chambolle_nd(image, weights, max_num_iter=200):
 
     """
 
-    assert weights.shape[0] == image.shape[-1] or weights.shape[0] == 1, \
+    assert weights.shape[0] == image.shape[-1] or weights.shape[0] == 1 or weights.shape == image.shape, \
         'Weights must have same size 1 or equal with number of image channels'
 
     ndim = image.get_shape().ndims
@@ -200,7 +200,7 @@ def denoise_tv_chambolle_nd(image, weights, max_num_iter=200):
 
         norm = tf.sqrt(tf.reduce_sum(g ** 2, axis=0))[None, ...]
         tau = 1. / (2. * ndim)
-        norm *= tau / weights
+        norm *= tau / tf.sqrt(weights ** 2)
         norm += 1.
         p = p - tau * g
         p = p / norm

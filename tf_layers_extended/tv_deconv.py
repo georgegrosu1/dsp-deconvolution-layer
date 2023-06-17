@@ -150,7 +150,6 @@ class TVDeconvolution2D(TVAbstractDeconvolution):
         # Apply bias accordingly to resulted shape
         if self.use_bias:
             x = x + self.b
-            tf.print(self.b)
 
         # And activation
         if self.activation is not None:

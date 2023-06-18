@@ -183,9 +183,9 @@ def denoise_tv_chambolle_nd(image, weights, max_num_iter=200):
         # Dimensions order must be rearranged
         g = tf.transpose(g, perm=[1, 0, 2, 3, 4])
 
-        norm = tf.sqrt(tf.reduce_sum(g ** 2, axis=0))
+        norm = tf.sqrt(tf.reduce_sum(g ** 2, axis=0))[tf.newaxis, ...]
         tau = 1. / (2. * p_shape[1])
-        norm *= tau / tf.sqrt(weights ** 2)
+        norm *= tau / weights ** 2
         norm += 1.
         p = p - tau * g
         p = p / norm

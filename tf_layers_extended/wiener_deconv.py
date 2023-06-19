@@ -1,5 +1,3 @@
-import copy
-
 import tensorflow as tf
 from tensorflow.keras import backend as bend
 from tensorflow.keras import initializers
@@ -143,7 +141,7 @@ class WienerDeconvolution1D(WienerAbstractDeconvolution):
 
     @tf.function
     def call(self, inputs, *args, **kwargs):
-        x = copy.copy(inputs)
+        x = tf.cast(inputs, dtype=tf.float32)
         # Make sure input shape corresponds to convention of (batch size, timestamps, features)
         assert bend.ndim(x) == 3, f'Inputs shape must be of form (batch size, #timestamps, #features, ' \
                                   f'yours is of form {bend.ndim(x)}'
@@ -247,7 +245,7 @@ class WienerDeconvolution2D(WienerAbstractDeconvolution):
 
     @tf.function
     def call(self, inputs, *args, **kwargs):
-        x = copy.copy(inputs)
+        x = tf.cast(inputs, dtype=tf.float32)
         # Make sure input shape corresponds to convention of (batch size, height, width, channels)
         assert bend.ndim(x) == 4, f'Inputs shape must be of form (batch size, width, height, channels)' \
                                   f'yours is of form {bend.ndim(x)}'

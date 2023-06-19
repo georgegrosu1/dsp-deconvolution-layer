@@ -99,7 +99,7 @@ def deconv2d(input_mat, filters, lambds):
                                                            fft_filters.shape[1],
                                                            fft_filters.shape[2]))
 
-    g_right_hand = (1 / (1 + 1 / ((tf.abs(fft_filters) ** 2) * input_snr)))
+    g_right_hand = (1 / (1 + 1 / ((tf.math.real(fft_filters) ** 2) * input_snr)))
     g_right_hand = tf.cast(g_right_hand, tf.complex64)
 
     g_freq_domain = (1 / fft_filters) * g_right_hand

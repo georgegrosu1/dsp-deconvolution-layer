@@ -1,5 +1,4 @@
 import tensorflow as tf
-from tensorflow.keras import backend as bend
 from tensorflow.keras import initializers
 from tensorflow.keras import regularizers
 from tensorflow.keras import activations
@@ -111,7 +110,6 @@ class TVDeconvolution2D(TVAbstractDeconvolution):
             self.lambdas = self.add_weight(shape=(1, 1),
                                            initializer=self.lambdas_initializer,
                                            regularizer=self.lambdas_regularizer,
-                                           constraint=tf.keras.constraints.non_neg(),
                                            trainable=True,
                                            name='lambdas',
                                            dtype='float32')
@@ -119,15 +117,13 @@ class TVDeconvolution2D(TVAbstractDeconvolution):
             self.lambdas = self.add_weight(shape=(1, input_shape[-1]),
                                            initializer=self.lambdas_initializer,
                                            regularizer=self.lambdas_regularizer,
-                                           constraint=tf.keras.constraints.non_neg(),
                                            trainable=True,
                                            name='lambdas',
                                            dtype='float32')
         elif self.lambdas_mode == 'full':
-            self.lambdas = self.add_weight(shape=input_shape,
+            self.lambdas = self.add_weight(shape=input_shape[1:],
                                            initializer=self.lambdas_initializer,
                                            regularizer=self.lambdas_regularizer,
-                                           constraint=tf.keras.constraints.non_neg(),
                                            trainable=True,
                                            name='lambdas',
                                            dtype='float32')

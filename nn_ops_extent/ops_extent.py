@@ -132,41 +132,35 @@ def denoise_tv_chambolle_nd(image, weights, max_num_iter=200, regularization_ter
     ----------
     """
     assert weights.shape[0] == image.shape[-1] or weights.shape[0] == 1 or weights.shape == image.shape[1:], \
-        'Weights must have same size 1 or equal with number of image channels'
+        'Weights must have same size 1, equal with number of image channels, or same shape as the image (without batch)'
 
     input_shape = image.get_shape()
     ndim = input_shape.ndims
+    assert ndim == 3 or ndim == 4, 'Input image must have either 3 (single image) or 4 (batch of images) dimensions'
+
+    if ndim == 3:
+        image = image[None, ...]
+        input_shape = image.get_shape()
+        ndim = input_shape.ndims
+
     p_shape = tf.TensorShape([input_shape[0], ndim - 1, input_shape[1], input_shape[2], input_shape[-1]])
 
     p = tf.zeros(p_shape, dtype=image.dtype)
     out = tf.zeros_like(image)
-
-    # Set slicing objects in advance to compute divergence for each iteration
-    slice_d_ax0 = [slice(None, None, None), slice(1, None, None), slice(None, None, None), slice(None, None, None)]
-    conct_d_ax0 = [slice(None, None, None), slice(None, 1, None), slice(None, None, None), slice(None, None, None)]
-    slice_p_ax0 = [slice(None, None, None), 0, slice(0, -1, None), slice(None, None, None), slice(None, None, None)]
-
-    slice_d_ax1 = [slice(None, None, None), slice(None, None, None), slice(1, None, None), slice(None, None, None)]
-    conct_d_ax1 = [slice(None, None, None), slice(None, None, None), slice(None, 1, None), slice(None, None, None)]
-    slice_p_ax1 = [slice(None, None, None), 1, slice(None, None, None), slice(0, -1, None), slice(None, None, None)]
-
-    slice_d_ax2 = [slice(None, None, None), slice(None, None, None), slice(None, None, None), slice(1, None, None)]
-    conct_d_ax2 = [slice(None, None, None), slice(None, None, None), slice(None, None, None), slice(None, 1, None)]
-    slice_p_ax2 = [slice(None, None, None), 2, slice(None, None, None), slice(None, None, None), slice(0, -1, None)]
 
     for i in tf.range(max_num_iter):
         if i > 0:
             # d will be the (negative) divergence of p
             d = tf.reduce_sum(-p, 1)
 
-            d_p_ax0 = d[slice_d_ax0] + p[slice_p_ax0]
-            d = tf.concat([d[conct_d_ax0], d_p_ax0], axis=1)
+            d_p_ax0 = d[:, 1:, :, :] + p[:, 0, :-1, :, :]
+            d = tf.concat([d[:, :1, :, :], d_p_ax0], axis=1)
 
-            d_p_ax1 = d[slice_d_ax1] + p[slice_p_ax1]
-            d = tf.concat([d[conct_d_ax1], d_p_ax1], axis=2)
+            d_p_ax1 = d[:, :, 1:, :] + p[:, 1, :, :-1, :]
+            d = tf.concat([d[:, :, :1, :], d_p_ax1], axis=2)
 
-            d_p_ax2 = d[slice_d_ax2] + p[slice_p_ax2]
-            d = tf.concat([d[conct_d_ax2], d_p_ax2], axis=3)
+            d_p_ax2 = d[:, :, :, 1:] + p[:, 2, :, :, :-1]
+            d = tf.concat([d[:, :, :, :1], d_p_ax2], axis=3)
 
             out = image + d * tf.cast((i != 0), d.dtype)
 
